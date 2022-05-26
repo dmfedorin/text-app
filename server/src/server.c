@@ -33,6 +33,8 @@ static void send_all(const char *msg)
         printf("server sent '%s' to all clients\n", msg);
 }
 
+static int accepted_cons;
+
 /* new thread created for every client */
 static void *serve_client(void *_client_sd)
 {
@@ -41,21 +43,24 @@ static void *serve_client(void *_client_sd)
         char recv_buf[max_msg_size];
 
         while (running) {
-                memset(recv_buf, '\0', sizeof(recv_buf));
-                if (recv(client_sd, recv_buf, sizeof(recv_buf), 0) < 0) {
-                        printf("server failed to recieve client message\n");
-                        exit(-1);
+                int rc = recv(client_sd, recv_buf, sizeof(recv_buf), 0);
+                if (rc <= 0) {
+                        printf("server failed to recieve client message, disconnecting\n");
+                        
+                        --accepted_cons;
+                        FD_CLR(client_sd, &client_sds);
+
+                        break;
                 }
+                else
+                        recv_buf[rc] = '\0';
 
                 printf("server recieved '%s' from %d\n", recv_buf, client_sd);
-
                 send_all(recv_buf);
         }
 
         return NULL;
 }
-
-static int accepted_cons;
 
 static void accept_clients(int max_cons, pthread_t client_threads[])
 {
